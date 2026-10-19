@@ -179,7 +179,7 @@ object PdfTools {
         require(pageIndices.isNotEmpty()) { "No pages selected" }
         val doc = load(context, uri)
         try {
-            require(pageIndices.all { it in (0 until doc.pages.size) }) { "Page out of range" }
+            require(pageIndices.all { it >= 0 && it < doc.getNumberOfPages() }) { "Page out of range" }
             val mod = ((degrees % 360) + 360) % 360
             pageIndices.forEach { index ->
                 val page = doc.getPage(index)
