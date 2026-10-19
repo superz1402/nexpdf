@@ -21,6 +21,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -53,7 +54,10 @@ import java.util.Date
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HomeScreen(onOpenDocument: (android.net.Uri) -> Unit) {
+fun HomeScreen(
+    onOpenDocument: (android.net.Uri) -> Unit,
+    onOpenTools: () -> Unit
+) {
     val context = LocalContext.current
     var docs by remember { mutableStateOf<List<PdfDoc>>(emptyList()) }
     var query by remember { mutableStateOf("") }
@@ -77,6 +81,14 @@ fun HomeScreen(onOpenDocument: (android.net.Uri) -> Unit) {
         topBar = {
             TopAppBar(
                 title = { Text("NexPDF") },
+                actions = {
+                    androidx.compose.material3.IconButton(onClick = onOpenTools) {
+                        Icon(
+                            Icons.Default.Tune,
+                            contentDescription = "Tools"
+                        )
+                    }
+                },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.surface
                 )
