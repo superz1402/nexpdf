@@ -44,11 +44,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import com.nexpdf.app.data.PdfLibrary
 import com.nexpdf.app.data.PdfDoc
+import com.nexpdf.app.ui.theme.NexMotion
 import java.text.DateFormat
 import java.util.Date
 
@@ -123,7 +125,10 @@ fun HomeScreen(
             }
             AnimatedContent(
                 targetState = filtered,
-                transitionSpec = { fadeIn() togetherWith fadeOut() }
+                transitionSpec = {
+                    fadeIn(animationSpec = tween(NexMotion.STANDARD, easing = NexMotion.EmphasizedDecelerate)) togetherWith
+                        fadeOut(animationSpec = tween(NexMotion.QUICK, easing = NexMotion.EmphasizedAccelerate))
+                }
             ) { list ->
                 if (list.isEmpty()) {
                     EmptyLibrary(onBrowse = { picker.launch(arrayOf("application/pdf")) })
