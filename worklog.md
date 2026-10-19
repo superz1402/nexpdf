@@ -1,5 +1,27 @@
 # worklog — NexPDF
 
+## 2026-10-19 SESSION 0 — Task #8 (Annotate & Fill & Sign) CLOSED
+Task: issue #8 · status CLOSED · branch main · head 877deab
+
+### Objective
+Last major Adobe-parity block: annotate + fill & sign on a saved-copy workflow.
+
+### Investigation
+- Chose flatten-into-content over native annotation objects because Android PdfRenderer skips annotations without appearance streams; engine builds one AP modifying content stream per op (AppendMode.APPEND, keep-content) with rotation-aware coordinate mapping.
+- Verified PDPageContentStream.AppendMode + PDColor support from classes.jar.
+
+### Implementation
+- data/PdfAnnotate.kt: Op sealed set (Ink/Note/Signature), FormValue; applyAll() chains ops + AcroForm set + optional flatten; listFields(); single stamp-named output via shared PdfTools.saveTo (made internal).
+- ui/annotate/AnnotateScreen.kt: per-page render 720px, ink draft/commit into per-page stroke map, note dialog, signature dialog (own canvas strokes reused for placement+PDF), form dialog (LazyColumn fields, editable text), tool rail with colors + form + save, snackbar results, busy gating.
+- Viewer gains pencil action → annotate route; AppRoot routing extended (annotate route returns to viewer).
+
+### Verification
+- 1 red run (FormValue reference slip + pfd stream load regression copy of PdfTools mistake) → fixed; success head 877deab.
+- Content flattening visible-in-any-viewer claim verified by code reasoning; visual on-device verification pending user.
+
+### Remaining work
+Deferred listed in issue comment (highlight w/ text-selection, pen widths, eraser, signature reuse). Session backlog nits unchanged.
+
 ## 2026-10-19 SESSION 0 — Task #6 (M3 Expressive bump) CLOSED
 Task: issue #6 · status CLOSED · branch main · head e440b46
 
