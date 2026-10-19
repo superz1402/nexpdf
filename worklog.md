@@ -1,5 +1,33 @@
 # worklog — NexPDF
 
+## 2026-10-19 SESSION 0 — Task #5 (tools engine) CLOSED
+Task: issue #5 · status CLOSED · branch main · head 68a1816
+
+### Objective
+Adobe-level organize/merge/split/convert capabilities with production output plumbing (Downloads on API29+).
+
+### Investigation
+- Verified real library API by inspecting classes.jar from pdfbox-android 2.0.27.0 AAR locally (multipdf.Splitter with .split(pdf), pdfbox.android.PDFBoxResourceLoader, PDDocument.load(InputStream), getPage/getNumberOfPages) — avoided guess-fix loops.
+- Output contract decision: write to MediaStore.Downloads (IS_PENDING 0/1 flow) on API29+; app-external Documents/NexPDF dir below API29. No storage permission needed (MediaStore contributes).
+
+### Implementation
+- data/PdfTools.kt (merge/extract/delete/reorder via Splitter page-wise assembly; rotate; split per-part; imagesToPdf JPEG92 LETTER fit) + Output class (pending→finished MediaStore lifecycle).
+- NexPdfApp + manifest application name: PDFBoxResourceLoader.init.
+- ui/tools/ToolsScreen.kt: 4 tool cards, IO-scope job with label()+fraction into animated progress card, OpenMultipleDocuments/OpenDocument pickers.
+- ui/organize/OrganizerScreen.kt: thumbnail grid (480px PdfRenderer renders, cached map), selection semantics, rotate/delete/move-up, save-copy chaining delete→rotate→reorder with position mapping (original→working index).
+- AppRoot: internal string routing home/viewer/tools/organizer; Home gains tune icon for tools.
+
+### Verification
+- 4 red runs fixed via root-cause from logs (each committed separately):
+  1. 39239233559 — package paths + pfd stream + string template + List<Int?>
+  2. 39239739472 — Splitter().split + organizer mapping nullability
+  3. 39240014433 — update() arity + pages range check
+  4. Final: run 39240720254 → SUCCESS (assembleDebug, head 68a1816).
+- Runtime (on-device) verification of generated PDFs not possible here — user-side to verify from Downloads; structural correctness relies on pdfbox save success + CI compile.
+
+### Remaining work
+Deferred nits tracked in SESSION_STATE; annotate/sign (#6 line) next along with expressive bump #6.
+
 ## 2026-10-19 SESSION 0 — Tasks #3 (viewer polish) + #4 (UI research) CLOSED
 Task: issues #3, #4 · status CLOSED · branch main
 
