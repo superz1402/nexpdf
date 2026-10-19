@@ -80,7 +80,7 @@ object PdfTools {
         }
     }
 
-    private fun saveTo(context: Context, doc: PDDocument, baseName: String): Uri {
+    internal fun saveTo(context: Context, doc: PDDocument, baseName: String): Uri {
         val output = Output(context, baseName)
         try {
             doc.save(output.stream)

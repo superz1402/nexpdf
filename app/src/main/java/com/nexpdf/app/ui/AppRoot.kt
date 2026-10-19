@@ -5,6 +5,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import com.nexpdf.app.ui.annotate.AnnotateScreen
 import com.nexpdf.app.ui.home.HomeScreen
 import com.nexpdf.app.ui.organize.OrganizerScreen
 import com.nexpdf.app.ui.tools.ToolsScreen
@@ -23,7 +24,12 @@ fun AppRoot(
     when (mode) {
         "viewer" -> ViewerScreen(
             uri = if (externalViewerUri != null) externalViewerUri else arg,
-            onClose = { if (externalViewerUri != null) onExternalViewerClosed() else internalRoute = "home" }
+            onClose = { if (externalViewerUri != null) onExternalViewerClosed() else internalRoute = "home" },
+            onAnnotate = { internalRoute = "annotate:$arg" }
+        )
+        "annotate" -> AnnotateScreen(
+            uri = arg,
+            onBack = { internalRoute = "viewer:$arg" }
         )
         "tools" -> ToolsScreen(
             onBack = { internalRoute = "home" },

@@ -1,0 +1,580 @@
+package com.nexpdf.app.ui.annotate
+
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.pdf.PdfRenderer
+import android.net.Uri
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.border
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Save
+import androidx.compose.material.icons.filled.StickyNote2
+import androidx.compose.material.icons.filled.Draw
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import com.nexpdf.app.data.PdfAnnotate
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlin.math.max
+
+private enum class Tool { INK, NOTE, SIGN }
+
+private data class InkStroke(val points: List<Pair<Float, Float>>, val colorInt: Int)
+
+private data class NoteItem(val nx: Float, val ny: Float, val text: String)
+
+private data class SigPlacement(val nx: Float, val ny: Float, val w: Float = 0.28f)
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun AnnotateScreen(uri: String, onBack: () -> Unit) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val snackbar = remember { SnackbarHostState() }
+    var busy by remember { mutableStateOf(false) }
+
+    var page by remember { mutableStateOf(0) }
+    var pageCount by remember { mutableStateOf(0) }
+    var bitmap by remember { mutableStateOf<Bitmap?>(null) }
+    var bitmapKey by remember { mutableStateOf(0) }
+    var aspect by remember { mutableStateOf(0.75f) }
+    var overlaySize by remember { mutableStateOf(IntSize.Zero) }
+
+    var tool by remember { mutableStateOf(Tool.INK) }
+    var inkColorInt by remember { mutableStateOf(android.graphics.Color.rgb(211, 47, 47)) }
+
+    var strokes by remember { mutableStateOf<Map<Int, List<InkStroke>>>(emptyMap()) }
+    var notes by remember { mutableStateOf<Map<Int, List<NoteItem>>>(emptyMap()) }
+    var sigStrokes by remember { mutableStateOf<List<List<Pair<Float, Float>>>?>(null) }
+    var sigPlacements by remember { mutableStateOf<List<SigPlacement>>(emptyList()) }
+    var draft by remember { mutableStateOf<List<Pair<Float, Float>>>(emptyList()) }
+
+    var noteDialogAt by remember { mutableStateOf<Pair<Float, Float>?>(null) }
+    var noteText by remember { mutableStateOf("") }
+    var sigDialogOpen by remember { mutableStateOf(false) }
+    var sigDraft by remember { mutableStateOf<List<List<Pair<Float, Float>>>>(emptyList()) }
+    var formDialogOpen by remember { mutableStateOf(false) }
+    var formFields by remember { mutableStateOf<List<PdfAnnotate.FormFieldInfo>>(emptyList()) }
+    var formValues by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
+
+    BackHandler { onBack() }
+
+    fun renderPage(target: Int, force: Boolean = false) {
+        scope.launch(Dispatchers.IO) {
+            val bmp = runCatching {
+                context.contentResolver.openFileDescriptor(Uri.parse(uri), "r")!!.use { pfd ->
+                    PdfRenderer(pfd).use { renderer ->
+                        pageCount = renderer.pageCount
+                        val pageRef = renderer.openPage(target)
+                        try {
+                            val w = 720
+                            val h = (w.toFloat() * pageRef.height / pageRef.width).toInt()
+                            val b = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+                            Canvas(b).drawColor(Color.WHITE)
+                            pageRef.render(b, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
+                            b
+                        } finally {
+                            pageRef.close()
+                        }
+                    }
+                }
+            }.getOrNull()
+            if (bmp != null) {
+                aspect = bmp.height.toFloat() / bmp.width
+                bitmap = bmp
+            }
+        }
+    }
+
+    LaunchedEffect(uri, page, bitmapKey) { renderPage(page) }
+
+    fun normFrom(offset: Offset): Pair<Float, Float> =
+        offset.x / max(overlaySize.width, 1) to offset.y / max(overlaySize.height, 1)
+
+    fun commitDraft() {
+        if (draft.size >= 2) {
+            val existing = strokes[page] ?: emptyList()
+            strokes = strokes + (page to existing + InkStroke(draft, inkColorInt))
+        }
+        draft = emptyList()
+    }
+
+    fun saveAll() {
+        if (busy) return
+        val ops = mutableListOf<PdfAnnotate.Op>()
+        strokes.forEach { (p, list) ->
+            val grouped = list.groupBy { it.colorInt }
+            grouped.forEach { (c, list2) ->
+                ops += PdfAnnotate.Op.Ink(
+                    page = p,
+                    strokes = list2.map { it.points },
+                    colorInt = c,
+                    widthNorm = 0.005f
+                )
+            }
+        }
+        notes.forEach { (p, list) ->
+            list.forEach { n -> ops += PdfAnnotate.Op.Note(p, n.nx, n.ny, n.text) }
+        }
+        sigPlacements.forEach { s ->
+            sigStrokes?.let {
+                ops += PdfAnnotate.Op.Signature(page, s.nx, s.ny, s.w, s.w * 0.6f, it, inkColorInt)
+            }
+        }
+        if (ops.isEmpty() && formValues.isEmpty()) {
+            scope.launch { snackbar.showSnackbar("Nothing to save yet") }
+            return
+        }
+        busy = true
+        scope.launch(Dispatchers.IO) {
+            val msg = PdfAnnotate.applyAll(
+                context, Uri.parse(uri), ops,
+                formValues.map { (name, value) -> PdfAnnotate.FormValue(name, value) }
+            ).fold(
+                onSuccess = { "Saved copy in Downloads" },
+                onFailure = { it.message ?: "Save failed" }
+            )
+            busy = false
+            snackbar.showSnackbar(msg)
+            if (msg.startsWith("Saved")) {
+                strokes = emptyMap()
+                notes = emptyMap()
+                sigPlacements = emptyList()
+                bitmapKey++
+            }
+        }
+    }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = {
+                    Column {
+                        Text("Annotate", maxLines = 1)
+                        Text(
+                            "Page ${page + 1} of ${max(pageCount, 1)}",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+                )
+            )
+        },
+        snackbarHost = { SnackbarHost(snackbar) },
+        bottomBar = {
+            Surface(color = MaterialTheme.colorScheme.surfaceContainer) {
+                Column(Modifier.fillMaxWidth().padding(8.dp)) {
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        TextButton(onClick = { if (page > 0) page-- }, enabled = page > 0) { Text("Prev") }
+                        TextButton(
+                            onClick = { if (pageCount > 0 && page < pageCount - 1) page++ },
+                            enabled = page < pageCount - 1
+                        ) { Text("Next") }
+                    }
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState())
+                            .padding(horizontal = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        listOf(
+                            Tool.INK to Icons.Default.Edit,
+                            Tool.NOTE to Icons.Default.StickyNote2,
+                            Tool.SIGN to Icons.Default.Draw
+                        ).forEach { (t, icon) ->
+                            IconButton(
+                                onClick = {
+                                    tool = t
+                                    if (t == Tool.SIGN) sigDialogOpen = true
+                                },
+                                modifier = Modifier.then(
+                                    if (tool == t) Modifier.background(
+                                        MaterialTheme.colorScheme.secondaryContainer,
+                                        CircleShape
+                                    ) else Modifier
+                                )
+                            ) {
+                                Icon(icon, contentDescription = t.name)
+                            }
+                        }
+                        listOf(
+                            0xFFD32F2F.toInt(),
+                            0xFF1976D2.toInt(),
+                            0xFF212121.toInt()
+                        ).forEach { c ->
+                            Box(
+                                Modifier
+                                    .size(28.dp)
+                                    .clip(CircleShape)
+                                    .background(androidx.compose.ui.graphics.Color(c))
+                                    .border(
+                                        2.dp,
+                                        if (inkColorInt == c) MaterialTheme.colorScheme.outline else androidx.compose.ui.graphics.Color.Transparent,
+                                        CircleShape
+                                    )
+                                    .clickable { inkColorInt = c }
+                            )
+                        }
+                        Box(Modifier.weight(1f))
+                        IconButton(onClick = { formDialogOpen = true }, enabled = !busy) {
+                            Icon(Icons.Default.Edit, contentDescription = "Form fields")
+                        }
+                        IconButton(onClick = ::saveAll, enabled = !busy) {
+                            Icon(Icons.Default.Save, contentDescription = "Save copy to Downloads")
+                        }
+                    }
+                }
+            }
+        }
+    ) { inner ->
+        val bmp = bitmap
+        Column(
+            Modifier
+                .fillMaxSize()
+                .padding(inner),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(12.dp)
+                    .aspectRatio(max(0.4f, 1f / max(aspect, 0.1f)))
+                    .clip(RoundedCornerShape(8.dp))
+            ) {
+                if (bmp == null) {
+                    Box(
+                        Modifier
+                            .fillMaxSize()
+                            .background(MaterialTheme.colorScheme.surfaceContainerHighest)
+                    )
+                } else {
+                    Image(
+                        bitmap = bmp.asImageBitmap(),
+                        contentDescription = null,
+                        contentScale = ContentScale.FillWidth,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                    Canvas(
+                        Modifier
+                            .fillMaxSize()
+                            .onSizeChanged { overlaySize = it }
+                            .pointerInput(tool, page) {
+                                if (tool == Tool.INK) {
+                                    detectDragGestures(
+                                        onDragStart = { pos -> draft = listOf(normFrom(pos)) },
+                                        onDrag = { change, _ ->
+                                            change.consume()
+                                            draft = draft + normFrom(change.position)
+                                        },
+                                        onDragEnd = { commitDraft() }
+                                    )
+                                } else {
+                                    detectTapGestures { pos ->
+                                        val (nx, ny) = normFrom(pos)
+                                        if (tool == Tool.NOTE) {
+                                            noteDialogAt = nx to ny
+                                        } else if (tool == Tool.SIGN) {
+                                            sigStrokes?.let {
+                                                sigPlacements = sigPlacements + SigPlacement(nx, ny)
+                                            } ?: run { sigDialogOpen = true }
+                                        }
+                                    }
+                                }
+                            }
+                    ) {
+                        val w = size.width
+                        val h = size.height
+                        val strokePx = (w * 0.005f).coerceAtLeast(3f)
+                        fun draw(points: List<Pair<Float, Float>>, color: Int) {
+                            if (points.size < 2) return
+                            val path = Path()
+                            points.forEachIndexed { i, (dx, dy) ->
+                                val x = dx * w
+                                val y = dy * h
+                                if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
+                            }
+                            drawPath(
+                                path,
+                                color = androidx.compose.ui.graphics.Color(color).copy(alpha = 0.8f),
+                                style = Stroke(width = strokePx)
+                            )
+                        }
+                        (strokes[page] ?: emptyList()).forEach { draw(it.points, it.colorInt) }
+                        draw(draft, inkColorInt)
+                        (notes[page] ?: emptyList()).forEach { n ->
+                            drawCircle(
+                                androidx.compose.ui.graphics.Color(0xFFFDD835),
+                                radius = strokePx * 0.9f,
+                                center = Offset(n.nx * w, n.ny * h)
+                            )
+                        }
+                        sigPlacements.forEach { p ->
+                            sigStrokes?.forEach { stroke ->
+                                val sub = stroke.map { (sx, sy) ->
+                                    (p.nx + sx * p.w) to (p.ny + sy * (p.w * 0.6f))
+                                }
+                                draw(sub, inkColorInt)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if (noteDialogAt != null) {
+        val (nx, ny) = noteDialogAt!!
+        AlertDialog(
+            onDismissRequest = { noteDialogAt = null },
+            title = { Text("Add note") },
+            text = {
+                OutlinedTextField(
+                    value = noteText,
+                    onValueChange = { noteText = it },
+                    placeholder = { Text("Type your note") },
+                    minLines = 2
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    if (noteText.isNotBlank()) {
+                        val existing = notes[page] ?: emptyList()
+                        notes = notes + (page to existing + NoteItem(nx, ny, noteText.trim()))
+                        noteText = ""
+                    }
+                    noteDialogAt = null
+                }) { Text("Add") }
+            },
+            dismissButton = { TextButton(onClick = { noteDialogAt = null }) { Text("Cancel") } }
+        )
+    }
+
+    if (sigDialogOpen) {
+        Dialog(onDismissRequest = { sigDialogOpen = false }) {
+            Surface(
+                shape = RoundedCornerShape(24.dp),
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                modifier = Modifier.fillMaxWidth().padding(16.dp)
+            ) {
+                Column(Modifier.padding(20.dp)) {
+                    Text("Draw your signature", style = MaterialTheme.typography.titleMedium)
+                    var sizeSig by remember { mutableStateOf(IntSize(1, 1)) }
+                    Canvas(
+                        Modifier
+                            .fillMaxWidth()
+                            .height(160.dp)
+                            .padding(top = 12.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(androidx.compose.ui.graphics.Color.White)
+                            .onSizeChanged { sizeSig = it }
+                            .pointerInput(Unit) {
+                                detectDragGestures(
+                                    onDragStart = { pos ->
+                                        sigDraft = sigDraft + listOf(
+                                            listOf(
+                                                pos.x / max(sizeSig.width, 1) to
+                                                    pos.y / max(sizeSig.height, 1)
+                                            )
+                                        )
+                                    },
+                                    onDrag = { change, _ ->
+                                        change.consume()
+                                        val last = sigDraft.lastOrNull() ?: return@detectDragGestures
+                                        sigDraft = sigDraft.dropLast(1) + listOf(
+                                            last + listOf(
+                                                change.position.x / max(sizeSig.width, 1) to
+                                                    change.position.y / max(sizeSig.height, 1)
+                                            )
+                                        )
+                                    }
+                                )
+                            }
+                    ) {
+                        sigDraft.forEach { pts ->
+                            if (pts.size >= 2) {
+                                val p = Path()
+                                pts.forEachIndexed { i, (x, y) ->
+                                    val px = x * size.width
+                                    val py = y * size.height
+                                    if (i == 0) p.moveTo(px, py) else p.lineTo(px, py)
+                                }
+                                drawPath(
+                                    p,
+                                    androidx.compose.ui.graphics.Color(0xFF102A43),
+                                    style = Stroke(width = 5f)
+                                )
+                            }
+                        }
+                    }
+                    Row(
+                        Modifier.fillMaxWidth().padding(top = 12.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        TextButton(onClick = { sigDraft = emptyList() }) { Text("Clear") }
+                        TextButton(onClick = {
+                            sigStrokes = sigDraft
+                            sigDialogOpen = false
+                        }) { Text("Use signature") }
+                    }
+                }
+            }
+        }
+    }
+
+    if (formDialogOpen) {
+        Dialog(onDismissRequest = { formDialogOpen = false }) {
+            Surface(
+                shape = RoundedCornerShape(24.dp),
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                modifier = Modifier.fillMaxWidth().padding(16.dp)
+            ) {
+                Column(Modifier.padding(20.dp)) {
+                    Text("Form fields", style = MaterialTheme.typography.titleMedium)
+                    LaunchedEffect(Unit) {
+                        formFields = withContext(Dispatchers.IO) {
+                            PdfAnnotate.listFields(context, Uri.parse(uri))
+                        }
+                    }
+                    if (formFields.isEmpty()) {
+                        Text(
+                            "This document has no fillable form fields.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.padding(vertical = 12.dp)
+                        )
+                    } else {
+                        LazyColumn(
+                            Modifier
+                                .fillMaxWidth()
+                                .height(280.dp)
+                                .padding(vertical = 8.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            items(formFields, key = { it.name }) { f ->
+                                if (f.isText && !f.readOnly) {
+                                    Column {
+                                        Text(f.name, style = MaterialTheme.typography.labelSmall)
+                                        OutlinedTextField(
+                                            value = formValues[f.name] ?: f.value,
+                                            onValueChange = { formValues = formValues + (f.name to it) },
+                                            singleLine = true,
+                                            modifier = Modifier.fillMaxWidth()
+                                        )
+                                    }
+                                } else {
+                                    Text(
+                                        "${f.name} = ${f.value}",
+                                        style = MaterialTheme.typography.bodyMedium
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    Row(
+                        Modifier.fillMaxWidth().padding(top = 8.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        TextButton(onClick = { formDialogOpen = false }) { Text("Close") }
+                        TextButton(
+                            onClick = {
+                                formDialogOpen = false
+                                if (formValues.isNotEmpty()) {
+                                    busy = true
+                                    scope.launch(Dispatchers.IO) {
+                                        val msg = PdfAnnotate.applyAll(
+                                            context, Uri.parse(uri),
+                                            emptyList(),
+                                            formValues.map { PdfAnnotate.FormValue(it.key, it.value) },
+                                            flattenForm = true
+                                        ).fold(
+                                            onSuccess = { "Form filled and flattened — copy in Downloads" },
+                                            onFailure = { it.message ?: "Save failed" }
+                                        )
+                                        busy = false
+                                        snackbar.showSnackbar(msg)
+                                        bitmapKey++
+                                    }
+                                }
+                            },
+                            enabled = formFields.isNotEmpty()
+                        ) { Text("Apply & flatten") }
+                    }
+                }
+            }
+        }
+    }
+}
+

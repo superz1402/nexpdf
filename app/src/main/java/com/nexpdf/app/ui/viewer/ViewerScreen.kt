@@ -27,7 +27,11 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -77,7 +81,7 @@ private sealed interface ViewerUi {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ViewerScreen(uri: String, onClose: () -> Unit) {
+fun ViewerScreen(uri: String, onClose: () -> Unit, onAnnotate: (String) -> Unit = {}) {
     val context = LocalContext.current
     val title = remember(uri) { uri.substringAfterLast('/') }
 
@@ -105,7 +109,7 @@ fun ViewerScreen(uri: String, onClose: () -> Unit) {
     }
 
     when (val state = uiState) {
-        is ViewerUi.Ready -> Pager(state)
+        is ViewerUi.Ready -> Pager(state, onAnnotate = { onAnnotate(uri) })
         is ViewerUi.Error -> ErrorPage(state, onClose)
         is ViewerUi.Loading -> LoadingPage(title)
     }
@@ -113,7 +117,7 @@ fun ViewerScreen(uri: String, onClose: () -> Unit) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun Pager(state: ViewerUi.Ready) {
+private fun Pager(state: ViewerUi.Ready, onAnnotate: () -> Unit) {
     val state2 = state.holder
     val listState = rememberLazyListState()
     var anyPageZoomed by remember { mutableStateOf(false) }
@@ -145,10 +149,15 @@ private fun Pager(state: ViewerUi.Ready) {
                             )
                         }
                     },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
-                    )
-                )
+                     actions = {
+                         IconButton(onClick = onAnnotate) {
+                             Icon(Icons.Default.Edit, contentDescription = "Annotate")
+                         }
+                     },
+                     colors = TopAppBarDefaults.topAppBarColors(
+                         containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+                     )
+                 )
                 val progressTarget = (currentPage + 1f) / state2.pageCount
                 val progress by animateFloatAsState(
                     targetValue = progressTarget,
