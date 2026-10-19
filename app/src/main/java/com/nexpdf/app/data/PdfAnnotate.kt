@@ -3,6 +3,7 @@ package com.nexpdf.app.data
 import android.content.Context
 import android.graphics.Color
 import android.net.Uri
+import android.os.ParcelFileDescriptor
 import com.tom_roush.pdfbox.cos.COSName
 import com.tom_roush.pdfbox.pdmodel.PDDocument
 import com.tom_roush.pdfbox.pdmodel.PDPageContentStream
@@ -47,7 +48,9 @@ object PdfAnnotate {
     private fun load(context: Context, uri: Uri): PDDocument {
         val pfd = context.contentResolver.openFileDescriptor(uri, "r")
             ?: throw IllegalStateException("Cannot open $uri")
-        pfd.use { return PDDocument.load(it.stream()) }
+        pfd.use {
+            return PDDocument.load(ParcelFileDescriptor.AutoCloseInputStream(pfd))
+        }
     }
 
     private fun pdColor(colorInt: Int, alpha: Float = 1f): PDColor {
@@ -97,7 +100,7 @@ object PdfAnnotate {
         context: Context,
         uri: Uri,
         ops: List<Op>,
-        formValues: List<Op.FormValue> = emptyList(),
+        formValues: List<FormValue> = emptyList(),
         flattenForm: Boolean = false
     ): Result<Uri> {
         if (ops.isEmpty() && formValues.isEmpty()) {
@@ -184,7 +187,7 @@ object PdfAnnotate {
 
     private fun applyForm(
         doc: PDDocument,
-        values: List<Op.FormValue>,
+        values: List<FormValue>,
         flatten: Boolean
     ) {
         val acroForm = doc.documentCatalog.acroForm ?: return
