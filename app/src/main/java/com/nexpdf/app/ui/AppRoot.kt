@@ -17,7 +17,7 @@ fun AppRoot(
     val activeUri = externalViewerUri ?: internalUri
 
     if (activeUri == null) {
-        HomeScreen(onOpenDocument = { internalUri = it })
+        HomeScreen(onOpenDocument = { internalUri = it.toString() })
     } else {
         ViewerScreen(
             uri = activeUri,
