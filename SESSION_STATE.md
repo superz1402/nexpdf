@@ -15,6 +15,9 @@ Updated: 2026-10-19 (Session 0)
 - Working: Home library (MediaStore + SAF picker + search), Viewer (PdfRenderer pages)
 - Not yet: tools engine, annotations, signatures, zoom, page tracking, M3 Expressive bump
 
+- Last commit: CI: 1-day artifact retention — SHA b290df9..(latest, see git log) · remote verified
+- CI: run 39233978878 → **success**; artifact `nexpdf-debug-apk` (16.4 MB, 1-day retention)
+
 ## Task queue (authoritative: docs/TASK_REGISTER.md + GitHub Issues)
 1. (next) Viewer polish: current-page tracking w/ scroll, zoom-pan, wavy progress — after CI green
 2. Tools engine via pdfbox-android (merge, split, rotate, delete pages)

@@ -1,5 +1,28 @@
 # worklog — NexPDF
 
+## 2026-10-19 SESSION 0 — CI GREEN (Increment 0 verified)
+Task: issues #1, #2 · status CLOSED · branch main · commit chain b290df9 → CI-fix commits
+
+### Objective
+Make the CI-only build pipeline green and deliver the first debug APK.
+
+### Investigation / failures fixed (failure-driven issues)
+1. Run 39232525582: android-actions/setup-android@v3 sdkmanager exit 1 (runner SDK conflict/licenses) → replaced with runner-preinstalled SDK + license acceptance step. Root cause, not symptom.
+2. Run 39232750739: Kotlin compile errors — AppRoot Uri→String mismatch; Folder/PictureAsPdf icons unresolved (icons-core only) → AppRoot `.toString()`, added material-icons-extended dep.
+3. Run 39233404604: BUILD **SUCCESSFUL** but "Artifact storage quota has been hit" on artifact upload (account-wide) → repo switched public (free artifact storage; user's accounts build in public by default) + 1-day retention; flagged to user.
+
+### Verification
+- Run 39233978878: conclusion **success**; artifacts `nexpdf-debug-apk` 16,400,651 bytes verified via API; APK listing on runner: 16,882,426 bytes app-debug.apk.
+- Limitation: no device/emulator here — runtime verification (launch, MediaStore on-device, renderer) pending user side-install.
+
+### Git persistence
+- main pushed after each fix; remote verified via commits API.
+
+### Remaining work
+Issues #3 (viewer polish), #4 (UI research deep-dive), #5 (pdfbox tools), #6 (M3 expressive bump) — next: #3.
+
+---
+
 ## 2026-10-19 SESSION 0 — Bootstrap
 Task: Session 0 bootstrap · status DONE · branch main
 
