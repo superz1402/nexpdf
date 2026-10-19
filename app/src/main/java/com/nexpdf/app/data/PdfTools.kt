@@ -123,7 +123,7 @@ object PdfTools {
         baseName: String
     ): Result<Uri> = runCatching {
         val doc = load(context, uri)
-        val singles = Splitter().splitDocument(doc)
+        val singles = Splitter().split(doc)
         try {
             require(order.isNotEmpty()) { "No pages selected" }
             require(order.all { it in singles.indices }) { "Page out of range" }
@@ -198,7 +198,7 @@ object PdfTools {
         onProgress: (Int, Int) -> Unit = { _, _ -> }
     ): Result<List<Uri>> = runCatching {
         val doc = load(context, uri)
-        val singles = Splitter().splitDocument(doc)
+        val singles = Splitter().split(doc)
         try {
             require(singles.size >= 2) { "Document must have at least 2 pages" }
             val per = pagesPerPart.coerceIn(1, singles.size)
