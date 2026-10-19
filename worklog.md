@@ -1,5 +1,27 @@
 # worklog — NexPDF
 
+## 2026-10-19 SESSION 0 — Task #6 (M3 Expressive bump) CLOSED
+Task: issue #6 · status CLOSED · branch main · head e440b46
+
+### Objective
+Move the stack to the Expressive-era Compose line without gambling the build.
+
+### Investigation
+- Pinned from maven.google.com evidence: BOM 2025.12.00 → compose ui 1.10.0 + material3 1.4.0 (verified via POM), AGP 8.10.1 (compileSdk 36 support; Gradle 8.11.1 compatible), kept Kotlin 2.1.20.
+- classes.jar inspection: MotionScheme + FlexibleBottomSheet are @Internal in material3 1.4.0 (MaterialThemeKt has motionScheme param but interface internal). 1.5.0-beta01 exists but unchecked publicness → chose stable.
+
+### Implementation
+- build.gradle.kts: AGP 8.10.1; app: compileSdk 36, BOM 2025.12.00.
+- Theme.kt reverted from MotionScheme (compile error proved internal-ness).
+- ui/theme/Motion.kt: NexMotion tokens (EmphasizedDecelerate/Accelerate/StandardEase + QUICK/STANDARD/EMPHASIZED durations + expressiveSpring) wired into Home library AnimatedContent transitions.
+- Follow-up issue created: adopt real MotionScheme on material3 1.5.0 stable.
+
+### Verification
+- CI success head e440b46. Runtime verification remains user-side (no device).
+
+### Remaining work
+All 6 original issues closed. Open: follow-up (1.5.0 stable adoption), annotate/fill&sign tracked under earlier scope note (new issue when started). Deferred nits in SESSION_STATE.
+
 ## 2026-10-19 SESSION 0 — Task #5 (tools engine) CLOSED
 Task: issue #5 · status CLOSED · branch main · head 68a1816
 

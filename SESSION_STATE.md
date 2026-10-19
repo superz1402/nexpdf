@@ -23,11 +23,11 @@ Updated: 2026-10-19 (Session 0)
 - Not yet: annotations, fill&sign, page-slider sheet, M3 Expressive bump, delete-list→working-index mapping edge cases on rotate-after-delete
 
 ## Task queue (authoritative: docs/TASK_REGISTER.md + GitHub Issues)
-1. (next) M3 1.4/BOM-2025.12 Expressive bump — issue #6 (compileSdk 36+, AGP bump) — riskiest, dedicated
-2. Annotate & Fill & Sign — pdfbox writer, androidx.ink UI later
+1. (next) Annotate & Fill & Sign — pdfbox writer + ink canvas UI (new issue)
+2. On 1.5.0 stable: adopt MotionScheme.expressive + FlexibleBottomSheet (follow-up issue #7)
 3. Deferred nits: pan clamping, page-slider sheet, skeleton placeholders, split options UI, org move-down
 
-Closed this session (evidence in issues): #1 bootstrap, #2 CI green + APK, #3 viewer polish, #4 UI research deep-dive, #5 tools engine.
+Closed this session (evidence in issues): #1 bootstrap, #2 CI green + APK, #3 viewer polish, #4 UI research deep-dive, #5 tools engine, #6 Expressive bump. Stack now: BOM 2025.12.00 (ui 1.10.0, m3 1.4.0), compileSdk 36, AGP 8.10.1, Kotlin 2.1.20.
 
 ## Blockers
 - No device/emulator: runtime verification impossible here — CI build verification only; user does on-device testing.
