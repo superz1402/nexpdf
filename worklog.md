@@ -1,5 +1,27 @@
 # worklog — NexPDF
 
+## 2026-10-19 SESSION 0 — Tasks #3 (viewer polish) + #4 (UI research) CLOSED
+Task: issues #3, #4 · status CLOSED · branch main
+
+### Objective
+#3: raise viewer to pro-grade (page tracking, zoom, progress). #4: extract reusable UI patterns from the owner's own Android repos into docs/UI_RESEARCH.md.
+
+### Investigation
+Subagent read actual Compose source at pinned SHAs: YFR@c54b2305 (BOM 2025.12.00; owns PdfViewerScreen: HorizontalPager+PdfRenderer+±1 page cache), AuraGallery@0722ea8 (IndexingProgressStrip), tabit@d84dafd (flat token objects), comet@26b4cc2 (one-moment rule), MomoCut@d055a6d4 (toolbarMode state machine, BackHandler cascade), Pdfeditor@7940a8d/Pdfcanvas@ee52d9a (tool taxonomy). Full facts/judgments in docs/UI_RESEARCH.md.
+
+### Implementation
+- app/src/main/java/com/nexpdf/app/ui/viewer/ViewerScreen.kt rewritten: derivedStateOf current-page tracking; animateFloatAsState progress (240ms) + a11y description; per-page pinch zoom 1x–4x + double-tap toggle; pager scroll locked while zoomed; DocumentHolder cleanup unchanged.
+- docs/UI_RESEARCH.md Phase 2 rewrite: per-repo facts, SHAs, file-path citations, anti-patterns, anchor-terminal 404 recorded, 7 decisions for NexPDF.
+
+### Verification
+- CI run 39235990433 success (assembleDebug). Gesture/rotation runtime verification impossible here (no device) — user-side manual test required; noted as limitation, not silently claimed done.
+
+### Git persistence
+- Commits pushed to main; remote verified via API.
+
+### Remaining work / next
+Issues #5 (pdfbox tools engine), #6 (M3 expressive bump). Deferred nits: pan-offset clamping at zoom>1, page-slider sheet, skeleton placeholders.
+
 ## 2026-10-19 SESSION 0 — CI GREEN (Increment 0 verified)
 Task: issues #1, #2 · status CLOSED · branch main · commit chain b290df9 → CI-fix commits
 
