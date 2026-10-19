@@ -1,7 +1,7 @@
 package com.nexpdf.app
 
 import android.app.Application
-import com.tom_roush.pdfbox.util.PDFBoxResourceLoader
+import com.tom_roush.pdfbox.android.PDFBoxResourceLoader
 
 class NexPdfApp : Application() {
     override fun onCreate() {

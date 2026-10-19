@@ -7,14 +7,15 @@ import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Build
 import android.os.Environment
+import android.os.ParcelFileDescriptor
 import android.provider.MediaStore
 import com.tom_roush.pdfbox.multipdf.PDFMergerUtility
+import com.tom_roush.pdfbox.multipdf.Splitter
 import com.tom_roush.pdfbox.pdmodel.PDDocument
 import com.tom_roush.pdfbox.pdmodel.PDPage
 import com.tom_roush.pdfbox.pdmodel.PDPageContentStream
 import com.tom_roush.pdfbox.pdmodel.common.PDRectangle
 import com.tom_roush.pdfbox.pdmodel.graphics.image.PDImageXObject
-import com.tom_roush.pdfbox.util.Splitter
 import java.io.ByteArrayOutputStream
 import java.io.Closeable
 import java.io.File
@@ -31,7 +32,9 @@ object PdfTools {
     private fun load(context: Context, uri: Uri): PDDocument {
         val pfd = context.contentResolver.openFileDescriptor(uri, "r")
             ?: throw IllegalStateException("Cannot open $uri")
-        pfd.use { return PDDocument.load(it.stream()) }
+        pfd.use {
+            return PDDocument.load(ParcelFileDescriptor.AutoCloseInputStream(pfd))
+        }
     }
 
     private class Output(
@@ -205,7 +208,7 @@ object PdfTools {
             var count = 0
             fun flush() {
                 if (count > 0) {
-                    created += saveTo(context, bucket, "NexPDF_part${created.size + 1}of$expected_${stamp()}.pdf")
+                    created += saveTo(context, bucket, "NexPDF_part${created.size + 1}of${expected}_${stamp()}.pdf")
                     onProgress(created.size, expected)
                 }
                 try { bucket.close() } catch (_: Exception) {}

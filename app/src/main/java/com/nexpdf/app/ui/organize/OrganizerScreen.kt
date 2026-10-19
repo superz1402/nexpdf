@@ -150,7 +150,7 @@ fun OrganizerScreen(uri: String, onBack: () -> Unit) {
 
                 val natural = (0 until pages.size).toList()
                 if (workingPos.size == pages.size) {
-                    val desired = pages.map { cell -> workingPos[cell.index] ?: return@map null }
+                    val desired: List<Int>? = pages.map { cell -> workingPos[cell.index] }
                     if (desired != null && desired != natural) {
                         work = PdfTools.reorder(context, work, desired).getOrThrow()
                     }
