@@ -6,7 +6,7 @@ plugins {
 
 android {
     namespace = "com.nexpdf.app"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.nexpdf.app"
@@ -36,7 +36,7 @@ android {
 
 dependencies {
     implementation("com.tom-roush:pdfbox-android:2.0.27.0")
-    implementation(platform("androidx.compose:compose-bom:2025.05.01"))
+    implementation(platform("androidx.compose:compose-bom:2025.12.00"))
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.material3:material3")
