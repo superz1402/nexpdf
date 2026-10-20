@@ -35,6 +35,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CleaningServices
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Highlight
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.StickyNote2
 import androidx.compose.material.icons.filled.Draw
@@ -63,6 +64,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -74,7 +76,9 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import com.nexpdf.app.data.PdfAnnotate
+import com.nexpdf.app.data.PdfText
 import com.nexpdf.app.data.SignatureStore
+import com.nexpdf.app.data.WordRect
 import com.nexpdf.app.ui.common.Skeleton
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -82,7 +86,7 @@ import kotlinx.coroutines.withContext
 import kotlin.math.max
 import kotlin.math.min
 
-private enum class Tool { INK, NOTE, SIGN, ERASE }
+private enum class Tool { INK, NOTE, SIGN, ERASE, HIGHLIGHT }
 
 private val PEN_WIDTHS = listOf(
     0.003f to 9.dp,
@@ -144,6 +148,10 @@ fun AnnotateScreen(uri: String, onBack: () -> Unit) {
     var sigStrokes by remember { mutableStateOf<List<List<Pair<Float, Float>>>?>(null) }
     var savedSigs by remember { mutableStateOf<List<SignatureStore.Signature>>(emptyList()) }
     var sigPlacements by remember { mutableStateOf<List<SigPlacement>>(emptyList()) }
+    var highlights by remember { mutableStateOf<Map<Int, List<WordRect>>>(emptyMap()) }
+    var selectRect by remember { mutableStateOf<WordRect?>(null) }
+    var extracting by remember { mutableStateOf(false) }
+    var dragStart by remember { mutableStateOf<Pair<Float, Float>?>(null) }
     var draft by remember { mutableStateOf<List<Pair<Float, Float>>>(emptyList()) }
 
     var noteDialogAt by remember { mutableStateOf<Pair<Float, Float>?>(null) }
@@ -214,6 +222,35 @@ fun AnnotateScreen(uri: String, onBack: () -> Unit) {
             hit
         }
         if (clear) strokes = strokes + (page to kept)
+        val curRects = highlights[page]
+        if (curRects != null && curRects.isNotEmpty()) {
+            val keptRects = curRects.filterNot { r ->
+                pos.x >= r.dx * w - t && pos.x <= (r.dx + r.dw) * w + t &&
+                    pos.y >= r.dy * h - t && pos.y <= (r.dy + r.dh) * h + t
+            }
+            if (keptRects.size != curRects.size) highlights = highlights + (page to keptRects)
+        }
+    }
+
+    fun commitHighlight(rawRect: WordRect) {
+        val page0 = page
+        if (rawRect.dw < 0.01f || rawRect.dh < 0.01f) return
+        extracting = true
+        scope.launch(Dispatchers.IO) {
+            val hits = runCatching {
+                PdfText.wordRects(context, Uri.parse(uri), page0)
+            }.getOrDefault(emptyList())
+                .filter { r ->
+                    r.dx < rawRect.dx + rawRect.dw && rawRect.dx < r.dx + r.dw &&
+                        r.dy < rawRect.dy + rawRect.dh && rawRect.dy < r.dy + r.dh
+                }
+            extracting = false
+            if (hits.isEmpty()) {
+                snackbar.showSnackbar("No text found under the selection on this page")
+            } else {
+                highlights = highlights + (page0 to (highlights[page0] ?: emptyList()) + hits)
+            }
+        }
     }
 
     fun saveAll() {
@@ -232,6 +269,11 @@ fun AnnotateScreen(uri: String, onBack: () -> Unit) {
         }
         notes.forEach { (p, list) ->
             list.forEach { n -> ops += PdfAnnotate.Op.Note(p, n.nx, n.ny, n.text) }
+        }
+        highlights.forEach { (p, list) ->
+            list.forEach { r ->
+                ops += PdfAnnotate.Op.Highlight(p, r.dx, r.dy, r.dw, r.dh, 0xFFFBC02D.toInt())
+            }
         }
         sigPlacements.forEach { s ->
             sigStrokes?.let {
@@ -257,6 +299,7 @@ fun AnnotateScreen(uri: String, onBack: () -> Unit) {
                 strokes = emptyMap()
                 notes = emptyMap()
                 sigPlacements = emptyList()
+                highlights = emptyMap()
                 bitmapKey++
             }
         }
@@ -312,7 +355,8 @@ fun AnnotateScreen(uri: String, onBack: () -> Unit) {
                             Tool.INK to Icons.Default.Edit,
                             Tool.NOTE to Icons.Default.StickyNote2,
                             Tool.SIGN to Icons.Default.Draw,
-                            Tool.ERASE to Icons.Default.CleaningServices
+                            Tool.ERASE to Icons.Default.CleaningServices,
+                            Tool.HIGHLIGHT to Icons.Default.Highlight
                         ).forEach { (t, icon) ->
                             IconButton(
                                 onClick = {
@@ -425,6 +469,27 @@ fun AnnotateScreen(uri: String, onBack: () -> Unit) {
                                         },
                                         onDragEnd = {}
                                     )
+                                    Tool.HIGHLIGHT -> detectDragGestures(
+                                        onDragStart = { pos ->
+                                            val (nx, ny) = normFrom(pos)
+                                            dragStart = nx to ny
+                                            selectRect = WordRect(nx, ny, 0f, 0f)
+                                        },
+                                        onDrag = { change, _ ->
+                                            change.consume()
+                                            val (sx, sy) = dragStart ?: return@detectDragGestures
+                                            val (cx, cy) = normFrom(change.position)
+                                            selectRect = WordRect(
+                                                min(sx, cx), min(sy, cy),
+                                                Math.abs(cx - sx), Math.abs(cy - sy)
+                                            )
+                                        },
+                                        onDragEnd = {
+                                            selectRect?.let { commitHighlight(it) }
+                                            selectRect = null
+                                            dragStart = null
+                                        }
+                                    )
                                     else -> detectTapGestures { pos ->
                                         val (nx, ny) = normFrom(pos)
                                         if (tool == Tool.NOTE) {
@@ -459,6 +524,26 @@ fun AnnotateScreen(uri: String, onBack: () -> Unit) {
                             draw(it.points, it.colorInt, w * it.widthNorm)
                         }
                         draw(draft, inkColorInt, w * penWidth)
+                        (highlights[page] ?: emptyList()).forEach { r ->
+                            drawRect(
+                                androidx.compose.ui.graphics.Color(0xFFFBC02D).copy(alpha = 0.35f),
+                                topLeft = Offset(r.dx * w, r.dy * h),
+                                size = Size(r.dw * w, r.dh * h)
+                            )
+                        }
+                        selectRect?.let { r ->
+                            drawRect(
+                                androidx.compose.ui.graphics.Color(0xFFFBC02D).copy(alpha = 0.18f),
+                                topLeft = Offset(r.dx * w, r.dy * h),
+                                size = Size((r.dw * w).coerceAtLeast(2f), (r.dh * h).coerceAtLeast(2f))
+                            )
+                            drawRect(
+                                androidx.compose.ui.graphics.Color(0xFFFBC02D),
+                                topLeft = Offset(r.dx * w, r.dy * h),
+                                size = Size((r.dw * w).coerceAtLeast(2f), (r.dh * h).coerceAtLeast(2f)),
+                                style = Stroke(width = 2f)
+                            )
+                        }
                         (notes[page] ?: emptyList()).forEach { n ->
                             drawCircle(
                                 androidx.compose.ui.graphics.Color(0xFFFDD835),

@@ -12,6 +12,7 @@ import com.tom_roush.pdfbox.pdmodel.font.PDType1Font
 import com.tom_roush.pdfbox.pdmodel.graphics.color.PDColor
 import com.tom_roush.pdfbox.pdmodel.graphics.color.PDDeviceRGB
 import com.tom_roush.pdfbox.pdmodel.graphics.image.PDImageXObject
+import com.tom_roush.pdfbox.pdmodel.graphics.state.PDExtendedGraphicsState
 import com.tom_roush.pdfbox.pdmodel.interactive.form.PDField
 
 object PdfAnnotate {
@@ -37,6 +38,14 @@ object PdfAnnotate {
             val rectNw: Float,
             val rectNh: Float,
             val strokes: List<List<Pair<Float, Float>>>,
+            val colorInt: Int
+        ) : Op
+        data class Highlight(
+            override val page: Int,
+            val rectNx: Float,
+            val rectNy: Float,
+            val rectNw: Float,
+            val rectNh: Float,
             val colorInt: Int
         ) : Op
     }
@@ -142,6 +151,19 @@ object PdfAnnotate {
                             }
                             is Op.Signature -> {
                                 drawSignature(cs, op, rect, rot, doc)
+                            }
+                            is Op.Highlight -> {
+                                val gs = PDExtendedGraphicsState()
+                                gs.setNonStrokingAlphaConstant(0.35f)
+                                cs.setGraphicsStateParameters(gs)
+                                cs.setNonStrokingColor(pdColor(op.colorInt))
+                                val (ax, ay) = pdfPoint(op.rectNx, op.rectNy, rect, rot)
+                                val (bx, by) = pdfPoint(op.rectNx + op.rectNw, op.rectNy + op.rectNh, rect, rot)
+                                cs.addRect(
+                                    minOf(ax, bx), minOf(ay, by),
+                                    Math.abs(bx - ax), Math.abs(by - ay)
+                                )
+                                cs.fill()
                             }
                         }
                     } finally {
