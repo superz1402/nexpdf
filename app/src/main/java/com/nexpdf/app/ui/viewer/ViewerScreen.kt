@@ -66,6 +66,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.nexpdf.app.ui.common.Skeleton
+import com.nexpdf.app.data.ReadingPositionStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -84,7 +85,7 @@ private class DocumentHolder(
 private sealed interface ViewerUi {
     data class Loading(val title: String) : ViewerUi
     data class Error(val title: String, val message: String) : ViewerUi
-    data class Ready(val title: String, val holder: DocumentHolder) : ViewerUi
+    data class Ready(val title: String, val uri: String, val holder: DocumentHolder) : ViewerUi
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -109,7 +110,7 @@ fun ViewerScreen(uri: String, onClose: () -> Unit, onAnnotate: (String) -> Unit 
                 DocumentHolder(PdfRenderer(pfd), pfd)
             }.onSuccess {
                 holder = it
-                uiState = ViewerUi.Ready(title, it)
+                uiState = ViewerUi.Ready(title, uri, it)
             }.onFailure {
                 uiState = ViewerUi.Error(title, it.message ?: "Could not open document")
             }
@@ -126,11 +127,13 @@ fun ViewerScreen(uri: String, onClose: () -> Unit, onAnnotate: (String) -> Unit 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun Pager(state: ViewerUi.Ready, onAnnotate: () -> Unit) {
+    val context = LocalContext.current
     val state2 = state.holder
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
     var anyPageZoomed by remember { mutableStateOf(false) }
     var jumpSheetOpen by remember { mutableStateOf(false) }
+    var positionRestored by remember { mutableStateOf(false) }
 
     val currentPage by remember {
         derivedStateOf {
@@ -146,6 +149,13 @@ private fun Pager(state: ViewerUi.Ready, onAnnotate: () -> Unit) {
     }
 
     Column(Modifier.fillMaxSize()) {
+        LaunchedEffect(state2) {
+            val saved = ReadingPositionStore.load(context, state.uri, state.title)
+            if (saved in 1 until state2.pageCount) {
+                listState.scrollToItem(saved)
+            }
+            positionRestored = true
+        }
         Surface(color = MaterialTheme.colorScheme.surfaceContainerHigh) {
             Column {
                 TopAppBar(
@@ -178,6 +188,11 @@ private fun Pager(state: ViewerUi.Ready, onAnnotate: () -> Unit) {
                     targetValue = progressTarget,
                     animationSpec = tween(240)
                 )
+                LaunchedEffect(currentPage) {
+                    if (positionRestored) {
+                        ReadingPositionStore.save(context, state.uri, state.title, currentPage)
+                    }
+                }
                 LinearProgressIndicator(
                     progress = { progress },
                     modifier = Modifier
