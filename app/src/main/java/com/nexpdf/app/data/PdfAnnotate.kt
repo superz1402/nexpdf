@@ -93,13 +93,16 @@ object PdfAnnotate {
         val y = uy - rect.lowerLeftY
         val w = rect.width
         val h = rect.height
-        return when (rotation % 4) {
+        return when (rotIndex(rotation)) {
             1 -> y / w to 1f - x / h
             2 -> 1f - x / w to y / h
             3 -> 1f - y / w to x / h
             else -> x / w to 1f - y / h
         }
     }
+
+    internal fun rotIndex(rotation: Int): Int =
+        (((rotation % 360) + 360) % 360) / 90
 
     internal fun strokeWidth(norm: Float, rect: PDRectangle): Float = (norm * rect.width).coerceIn(0.8f, 24f)
 

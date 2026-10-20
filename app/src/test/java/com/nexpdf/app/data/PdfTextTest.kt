@@ -59,14 +59,14 @@ class PdfTextTest {
 
     @Test
     fun toDisplayRot180Mirrors() {
-        val r = PdfText.toDisplay(100f, 200f, 40f, 20f, 400f, 600f, 2)
+        val r = PdfText.toDisplay(100f, 200f, 40f, 20f, 400f, 600f, 180)
         assertEquals((400f - 140f) / 400f, r.dx, 0.001f)
         assertEquals((600f - 220f) / 600f, r.dy, 0.001f)
     }
 
     @Test
     fun toDisplayRot90SwapsAxes() {
-        val r = PdfText.toDisplay(100f, 200f, 60f, 20f, 400f, 800f, 1)
+        val r = PdfText.toDisplay(100f, 200f, 60f, 20f, 400f, 800f, 90)
         assertEquals((800f - 220f) / 800f, r.dx, 0.001f)
         assertEquals(100f / 400f, r.dy, 0.001f)
         assertEquals(20f / 800f, r.dw, 0.001f)
@@ -75,7 +75,7 @@ class PdfTextTest {
 
     @Test
     fun displayRectStaysInUnitSquareAllRotations() {
-        for (rot in 0..3) {
+        for (rot in listOf(0, 90, 180, 270)) {
             val r = PdfText.toDisplay(10f, 20f, 380f, 50f, 400f, 600f, rot)
             assertTrue(r.dx >= -0.001f && r.dx + r.dw <= 1.001f, "rot=$rot dx=${r.dx} dw=${r.dw}")
             assertTrue(r.dy >= -0.001f && r.dy + r.dh <= 1.001f, "rot=$rot dy=${r.dy} dh=${r.dh}")

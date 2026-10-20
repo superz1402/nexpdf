@@ -65,4 +65,14 @@ class PdfAnnotateTest {
         assertEquals(24f, PdfAnnotate.strokeWidth(1f, rect), 0.001f)
         assertEquals(2.5f, PdfAnnotate.strokeWidth(0.005f, rect), 0.001f)
     }
+
+    @Test
+    fun rotIndexMapsDegreesWithWraparound() {
+        assertEquals(0, PdfAnnotate.rotIndex(0))
+        assertEquals(1, PdfAnnotate.rotIndex(90))
+        assertEquals(2, PdfAnnotate.rotIndex(180))
+        assertEquals(3, PdfAnnotate.rotIndex(270))
+        assertEquals(1, PdfAnnotate.rotIndex(450))
+        assertEquals(3, PdfAnnotate.rotIndex(-90))
+    }
 }

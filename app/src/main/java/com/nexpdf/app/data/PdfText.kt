@@ -82,7 +82,7 @@ object PdfText {
         x: Float, yTop: Float, w: Float, h: Float,
         wU: Float, hU: Float, rot: Int
     ): WordRect {
-        return when (rot % 4) {
+        return when (PdfAnnotate.rotIndex(rot)) {
             1 -> WordRect(
                 (hU - yTop - h) / hU, x / wU, h / hU, w / wU
             )
