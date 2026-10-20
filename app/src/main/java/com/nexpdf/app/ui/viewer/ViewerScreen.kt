@@ -26,7 +26,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.matchParentSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -156,11 +155,23 @@ private fun Pager(state: ViewerUi.Ready, onAnnotate: () -> Unit) {
     var searchInput by remember { mutableStateOf("") }
     var preSearchPage by remember { mutableIntStateOf(0) }
 
+    val currentPage by remember {
+        derivedStateOf {
+            val info = listState.layoutInfo
+            val visible = info.visibleItemsInfo
+            if (visible.isEmpty()) 0 else {
+                val dy = listState.firstVisibleItemScrollOffset.toFloat() /
+                    (info.viewportSize.height.coerceAtLeast(1)).toFloat()
+                (listState.firstVisibleItemIndex + if (dy > 0.6f && visible.size > 1) 1 else 0)
+                    .coerceIn(0, state2.pageCount - 1)
+            }
+        }
+    }
+
     fun openSearch() {
         preSearchPage = currentPage
         search = SearchUi(emptyList(), -1, busy = false)
     }
-
     fun closeSearch() {
         search = null
         scope.launch { listState.scrollToItem(preSearchPage) }
@@ -187,19 +198,6 @@ private fun Pager(state: ViewerUi.Ready, onAnnotate: () -> Unit) {
         val next = (s.active + delta).mod(s.matches.size)
         search = s.copy(active = next)
         scope.launch { listState.scrollToItem(s.matches[next].pageIndex) }
-    }
-
-    val currentPage by remember {
-        derivedStateOf {
-            val info = listState.layoutInfo
-            val visible = info.visibleItemsInfo
-            if (visible.isEmpty()) 0 else {
-                val dy = listState.firstVisibleItemScrollOffset.toFloat() /
-                    (info.viewportSize.height.coerceAtLeast(1)).toFloat()
-                (listState.firstVisibleItemIndex + if (dy > 0.6f && visible.size > 1) 1 else 0)
-                    .coerceIn(0, state2.pageCount - 1)
-            }
-        }
     }
 
     BackHandler(enabled = jumpSheetOpen) { jumpSheetOpen = false }
