@@ -15,7 +15,7 @@ Owner-side runtime test list: docs/TEST_PLAN.md · Current-state rationale: docs
 | Thumbnails panel (reader) | Absent | organizer thumbnails exist |
 | TOC / outline panel | Absent | pdfbox outlines extractable |
 | Bookmarks | Absent | |
-| **Persistent reading position** | **Absent** | top gap |
+| **Persistent reading position** | **Working** @ 586614a (issue #14) | runtime NOT RUN by owner yet; zoom persistence → #27 |
 | Restore state on resume | Partial | process death loses everything |
 | Night mode | Absent | trivial on rendered bitmaps |
 | Encrypted PDF open | Absent | renderer exception → error page |
@@ -25,9 +25,9 @@ Owner-side runtime test list: docs/TEST_PLAN.md · Current-state rationale: docs
 ## B. Search
 | Capability | Status | Note |
 |---|---|---|
-| Text search over document | **Absent UI** | engine exists (PdfText per-page word rects, rot-aware) |
-| Highlight matches + navigate | Absent | |
-| No-results state | n/a | |
+| Text search over document | Working (engine + UI, @ e09c0cd) | runtime NOT RUN by owner yet; no OCR |
+| Highlight matches + navigate | Working | page-level navigation; wraps; overlays scale with zoom |
+| No-results state | Working | "No matches" label in search bar |
 | OCR-derived search | Absent | engine decision pending |
 
 ## C. Annotate / markup
