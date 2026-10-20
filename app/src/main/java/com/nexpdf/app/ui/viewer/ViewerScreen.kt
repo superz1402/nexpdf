@@ -312,8 +312,10 @@ private fun ZoomablePage(
                         .graphicsLayer {
                             scaleX = scale
                             scaleY = scale
-                            translationX = offset.x
-                            translationY = offset.y
+                            val maxX = size.width * (scale - 1f) / 2f
+                            val maxY = size.height * (scale - 1f) / 2f
+                            translationX = offset.x.coerceIn(-maxX, maxX)
+                            translationY = offset.y.coerceIn(-maxY, maxY)
                         }
                 ) {
                     Image(
