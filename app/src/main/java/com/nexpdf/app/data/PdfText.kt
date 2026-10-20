@@ -35,8 +35,10 @@ object PdfText {
         }
     }
 
+    private data class Quad(val x: Float, val yTop: Float, val w: Float, val h: Float)
+
     private class WordCollector : PDFTextStripper() {
-        val words = mutableListOf<android.graphics.RectF>()
+        val words = mutableListOf<Quad>()
         var x0 = 0f
         var yTop = 0f
         var curWidth = 0f
@@ -70,7 +72,7 @@ object PdfText {
 
         fun flush() {
             if (started && curWidth > 0 && curHeight > 0) {
-                words.add(android.graphics.RectF(x0, yTop, x0 + curWidth, yTop + curHeight))
+                words.add(Quad(x0, yTop, curWidth, curHeight))
             }
             started = false
         }
