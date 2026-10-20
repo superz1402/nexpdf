@@ -10,6 +10,8 @@ Authoritative status live in GitHub Issues; this is the index map.
 | 4 | UI research deep-dive over user's Android repos | P1 | CLOSED | 2 |
 | 5 | Tools engine (pdfbox): merge/split/rotate/delete | P1 | CLOSED (run 39240720254) | 2 |
 | 6 | M3 Expressive bump (BOM 2025.12.00, compileSdk 36, AGP 8.10.1) | P2 | CLOSED (run e440b46) | 2 |
-| 7 | Annotate + Fill & Sign | P2 | open | 5 |
+| 7 | Adopt material3 1.5.0 stable MotionScheme + FlexibleBottomSheet when stable | P2 | open (blocked on 1.5.0 stable) | 6 |
+| 8 | Annotate + Fill & Sign | P2 | CLOSED (run 39248398340) | 5 |
+| 9 | UX polish wave: page-slider sheet, skeleton placeholders, pen width/eraser, signature library | P1 | CLOSED (run 39378096248) | 5, 8 |
 
-Issues #1–#6 created 2026-10-19; #1,#2 closed with CI evidence. #7 maps to issue #6's follow-up.
+Issues #1–#9 created 2026-10-19/20; #8 and #9 closed with CI evidence. #7 stays open while material3 1.5.0 remains beta.

@@ -1,5 +1,30 @@
 # worklog — NexPDF
 
+## 2026-10-20 SESSION 1 — Task #9 (UX polish wave) CLOSED
+Task: issue #9 · status CLOSED · branch main · head 9e43519
+
+### Objective
+Close the deferred nits from #3/#5/#8: page-slider sheet, skeleton placeholders, pen widths + eraser, signature reuse.
+
+### Investigation
+- Verified against material-icons-extended 1.7.8 classes.jar (AAR downloaded from maven.google.com) that no dedicated eraser glyph exists (only PhonelinkErase variants) → used CleaningServices for the eraser tool rather than guessing an icon into a red CI run.
+- Signature persistence: chose org.json over adding kotlinx.serialization — zero new deps, app-private files dir.
+
+### Implementation
+- ui/common/Skeleton.kt: shared pulsing skeleton (alpha 0.5→1, 700ms reverse repeat), used by viewer pages (A4-fallback aspect) and annotate loading.
+- ViewerScreen: clickable page indicator (enabled when pageCount > 1) opens ModalBottomSheet with Slider; onValueChangeFinished animates `listState.animateScrollToItem`.
+- AnnotateScreen: PEN_WIDTHS (0.003/0.005/0.009 width-norm, dot previews) shown only on ink tool; InkStroke carries widthNorm; saveAll groups ops by (color,width); eraser drag removes strokes via hit-test (4% of shorter overlay dimension, min 16px); note dot and draft use per-width stroke rendering.
+- data/SignatureStore.kt: list/save/delete signatures as JSON in filesDir/signatures.json (all IO-dispatched). Signature dialog: saved previews row (tap to reuse, X to delete, 110×56dp chips), draw-new pad unchanged, buttons Clear / Use signature / Save & use (last also persists).
+- Compact 20dp delete affordance instead of IconButton inside chips (48dp min touch target would swallow preview taps).
+
+### Verification
+- CI run 39378096248 → success @ 9e43519; artifact `nexpdf-debug-apk` 27,361,923 bytes verified via API.
+- Runtime verification (slider feel, eraser precision, signature reuse) requires on-device testing by owner.
+
+### Remaining work
+- text-selection highlight (needs PDFTextStripper coordinate mapping) — optional queue item.
+- Pan clamping at zoom>1 still nit-open; signature dedupe on save possible later.
+
 ## 2026-10-19 SESSION 0 — Task #8 (Annotate & Fill & Sign) CLOSED
 Task: issue #8 · status CLOSED · branch main · head 877deab
 
