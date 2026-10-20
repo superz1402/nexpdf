@@ -13,6 +13,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.rememberTransformableState
 import androidx.compose.foundation.gestures.transformable
@@ -20,13 +21,13 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -34,18 +35,23 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -59,7 +65,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import com.nexpdf.app.ui.common.Skeleton
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 private class DocumentHolder(
@@ -120,7 +128,9 @@ fun ViewerScreen(uri: String, onClose: () -> Unit, onAnnotate: (String) -> Unit 
 private fun Pager(state: ViewerUi.Ready, onAnnotate: () -> Unit) {
     val state2 = state.holder
     val listState = rememberLazyListState()
+    val scope = rememberCoroutineScope()
     var anyPageZoomed by remember { mutableStateOf(false) }
+    var jumpSheetOpen by remember { mutableStateOf(false) }
 
     val currentPage by remember {
         derivedStateOf {
@@ -140,7 +150,12 @@ private fun Pager(state: ViewerUi.Ready, onAnnotate: () -> Unit) {
             Column {
                 TopAppBar(
                     title = {
-                        Column {
+                        Column(
+                            Modifier.then(
+                                if (state2.pageCount > 1) Modifier.clickable { jumpSheetOpen = true }
+                                else Modifier
+                            )
+                        ) {
                             Text(state.title, maxLines = 1)
                             Text(
                                 "Page ${currentPage + 1} of ${state2.pageCount}",
@@ -190,6 +205,32 @@ private fun Pager(state: ViewerUi.Ready, onAnnotate: () -> Unit) {
                         if (anyPageZoomed && !it) anyPageZoomed = false
                     },
                     modifier = Modifier.fillMaxWidth()
+                )
+            }
+        }
+    }
+
+    if (jumpSheetOpen) {
+        var selection by remember { mutableIntStateOf(currentPage) }
+        ModalBottomSheet(
+            onDismissRequest = { jumpSheetOpen = false },
+            sheetState = rememberModalBottomSheetState()
+        ) {
+            Column(Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 16.dp)) {
+                Text("Jump to page", style = MaterialTheme.typography.titleMedium)
+                Text(
+                    "Page ${selection + 1} of ${state2.pageCount}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 4.dp)
+                )
+                Slider(
+                    value = selection.toFloat(),
+                    onValueChange = { selection = it.toInt() },
+                    onValueChangeFinished = {
+                        scope.launch { listState.animateScrollToItem(selection) }
+                    },
+                    valueRange = 0f..(state2.pageCount - 1).toFloat()
                 )
             }
         }
@@ -256,13 +297,7 @@ private fun ZoomablePage(
             .clipToBounds()
     ) {
         if (bitmap == null) {
-            Surface(
-                shape = RoundedCornerShape(8.dp),
-                color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 220.dp)
-            ) {}
+            Skeleton(Modifier.fillMaxWidth().aspectRatio(1f / 1.4142f))
         }
         AnimatedVisibility(visible = bitmap != null, enter = fadeIn(), exit = fadeOut()) {
             bitmap?.let {

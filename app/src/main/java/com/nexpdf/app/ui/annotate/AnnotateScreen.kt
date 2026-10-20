@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
@@ -31,6 +32,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.border
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.CleaningServices
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.StickyNote2
@@ -63,7 +66,6 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
@@ -72,18 +74,51 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import com.nexpdf.app.data.PdfAnnotate
+import com.nexpdf.app.data.SignatureStore
+import com.nexpdf.app.ui.common.Skeleton
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.math.max
+import kotlin.math.min
 
-private enum class Tool { INK, NOTE, SIGN }
+private enum class Tool { INK, NOTE, SIGN, ERASE }
 
-private data class InkStroke(val points: List<Pair<Float, Float>>, val colorInt: Int)
+private val PEN_WIDTHS = listOf(
+    0.003f to 9.dp,
+    0.005f to 15.dp,
+    0.009f to 22.dp
+)
+
+private data class InkStroke(val points: List<Pair<Float, Float>>, val colorInt: Int, val widthNorm: Float)
 
 private data class NoteItem(val nx: Float, val ny: Float, val text: String)
 
 private data class SigPlacement(val nx: Float, val ny: Float, val w: Float = 0.28f)
+
+@Composable
+private fun SignaturePreview(
+    strokes: List<List<Pair<Float, Float>>>,
+    modifier: Modifier = Modifier
+) {
+    Canvas(modifier) {
+        strokes.forEach { pts ->
+            if (pts.size >= 2) {
+                val p = Path()
+                pts.forEachIndexed { i, (x, y) ->
+                    val px = x * size.width
+                    val py = y * size.height
+                    if (i == 0) p.moveTo(px, py) else p.lineTo(px, py)
+                }
+                drawPath(
+                    p,
+                    androidx.compose.ui.graphics.Color(0xFF102A43),
+                    style = Stroke(width = 4f)
+                )
+            }
+        }
+    }
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -102,10 +137,12 @@ fun AnnotateScreen(uri: String, onBack: () -> Unit) {
 
     var tool by remember { mutableStateOf(Tool.INK) }
     var inkColorInt by remember { mutableStateOf(android.graphics.Color.rgb(211, 47, 47)) }
+    var penWidth by remember { mutableStateOf(0.005f) }
 
     var strokes by remember { mutableStateOf<Map<Int, List<InkStroke>>>(emptyMap()) }
     var notes by remember { mutableStateOf<Map<Int, List<NoteItem>>>(emptyMap()) }
     var sigStrokes by remember { mutableStateOf<List<List<Pair<Float, Float>>>?>(null) }
+    var savedSigs by remember { mutableStateOf<List<SignatureStore.Signature>>(emptyList()) }
     var sigPlacements by remember { mutableStateOf<List<SigPlacement>>(emptyList()) }
     var draft by remember { mutableStateOf<List<Pair<Float, Float>>>(emptyList()) }
 
@@ -154,22 +191,42 @@ fun AnnotateScreen(uri: String, onBack: () -> Unit) {
     fun commitDraft() {
         if (draft.size >= 2) {
             val existing = strokes[page] ?: emptyList()
-            strokes = strokes + (page to existing + InkStroke(draft, inkColorInt))
+            strokes = strokes + (page to existing + InkStroke(draft, inkColorInt, penWidth))
         }
         draft = emptyList()
+    }
+
+    fun eraseAt(pos: Offset) {
+        if (overlaySize.width <= 0 || overlaySize.height <= 0) return
+        val cur = strokes[page] ?: return
+        val w = overlaySize.width
+        val h = overlaySize.height
+        val t = (min(w, h) * 0.04f).coerceAtLeast(16f)
+        val t2 = t * t
+        var clear = false
+        val kept = cur.filterNot { stroke ->
+            val hit = stroke.points.any { (dx, dy) ->
+                val ex = dx * w - pos.x
+                val ey = dy * h - pos.y
+                ex * ex + ey * ey <= t2
+            }
+            if (hit) clear = true
+            hit
+        }
+        if (clear) strokes = strokes + (page to kept)
     }
 
     fun saveAll() {
         if (busy) return
         val ops = mutableListOf<PdfAnnotate.Op>()
         strokes.forEach { (p, list) ->
-            val grouped = list.groupBy { it.colorInt }
-            grouped.forEach { (c, list2) ->
+            val grouped = list.groupBy { it.colorInt to it.widthNorm }
+            grouped.forEach { (key, list2) ->
                 ops += PdfAnnotate.Op.Ink(
                     page = p,
                     strokes = list2.map { it.points },
-                    colorInt = c,
-                    widthNorm = 0.005f
+                    colorInt = key.first,
+                    widthNorm = key.second
                 )
             }
         }
@@ -254,7 +311,8 @@ fun AnnotateScreen(uri: String, onBack: () -> Unit) {
                         listOf(
                             Tool.INK to Icons.Default.Edit,
                             Tool.NOTE to Icons.Default.StickyNote2,
-                            Tool.SIGN to Icons.Default.Draw
+                            Tool.SIGN to Icons.Default.Draw,
+                            Tool.ERASE to Icons.Default.CleaningServices
                         ).forEach { (t, icon) ->
                             IconButton(
                                 onClick = {
@@ -289,6 +347,27 @@ fun AnnotateScreen(uri: String, onBack: () -> Unit) {
                                     .clickable { inkColorInt = c }
                             )
                         }
+                        if (tool == Tool.INK) {
+                            PEN_WIDTHS.forEach { (wn, dot) ->
+                                Box(
+                                    Modifier
+                                        .size(28.dp)
+                                        .clip(CircleShape)
+                                        .clickable { penWidth = wn },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Box(
+                                        Modifier
+                                            .size(dot)
+                                            .clip(CircleShape)
+                                            .background(
+                                                if (penWidth == wn) MaterialTheme.colorScheme.onSurface
+                                                else MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                    )
+                                }
+                            }
+                        }
                         Box(Modifier.weight(1f))
                         IconButton(onClick = { formDialogOpen = true }, enabled = !busy) {
                             Icon(Icons.Default.Edit, contentDescription = "Form fields")
@@ -316,11 +395,7 @@ fun AnnotateScreen(uri: String, onBack: () -> Unit) {
                     .clip(RoundedCornerShape(8.dp))
             ) {
                 if (bmp == null) {
-                    Box(
-                        Modifier
-                            .fillMaxSize()
-                            .background(MaterialTheme.colorScheme.surfaceContainerHighest)
-                    )
+                    Skeleton(Modifier.fillMaxSize())
                 } else {
                     Image(
                         bitmap = bmp.asImageBitmap(),
@@ -333,8 +408,8 @@ fun AnnotateScreen(uri: String, onBack: () -> Unit) {
                             .fillMaxSize()
                             .onSizeChanged { overlaySize = it }
                             .pointerInput(tool, page) {
-                                if (tool == Tool.INK) {
-                                    detectDragGestures(
+                                when (tool) {
+                                    Tool.INK -> detectDragGestures(
                                         onDragStart = { pos -> draft = listOf(normFrom(pos)) },
                                         onDrag = { change, _ ->
                                             change.consume()
@@ -342,8 +417,15 @@ fun AnnotateScreen(uri: String, onBack: () -> Unit) {
                                         },
                                         onDragEnd = { commitDraft() }
                                     )
-                                } else {
-                                    detectTapGestures { pos ->
+                                    Tool.ERASE -> detectDragGestures(
+                                        onDragStart = { eraseAt(it) },
+                                        onDrag = { change, _ ->
+                                            change.consume()
+                                            eraseAt(change.position)
+                                        },
+                                        onDragEnd = {}
+                                    )
+                                    else -> detectTapGestures { pos ->
                                         val (nx, ny) = normFrom(pos)
                                         if (tool == Tool.NOTE) {
                                             noteDialogAt = nx to ny
@@ -359,7 +441,7 @@ fun AnnotateScreen(uri: String, onBack: () -> Unit) {
                         val w = size.width
                         val h = size.height
                         val strokePx = (w * 0.005f).coerceAtLeast(3f)
-                        fun draw(points: List<Pair<Float, Float>>, color: Int) {
+                        fun draw(points: List<Pair<Float, Float>>, color: Int, px: Float = strokePx) {
                             if (points.size < 2) return
                             val path = Path()
                             points.forEachIndexed { i, (dx, dy) ->
@@ -370,11 +452,13 @@ fun AnnotateScreen(uri: String, onBack: () -> Unit) {
                             drawPath(
                                 path,
                                 color = androidx.compose.ui.graphics.Color(color).copy(alpha = 0.8f),
-                                style = Stroke(width = strokePx)
+                                style = Stroke(width = px.coerceAtLeast(3f))
                             )
                         }
-                        (strokes[page] ?: emptyList()).forEach { draw(it.points, it.colorInt) }
-                        draw(draft, inkColorInt)
+                        (strokes[page] ?: emptyList()).forEach {
+                            draw(it.points, it.colorInt, w * it.widthNorm)
+                        }
+                        draw(draft, inkColorInt, w * penWidth)
                         (notes[page] ?: emptyList()).forEach { n ->
                             drawCircle(
                                 androidx.compose.ui.graphics.Color(0xFFFDD835),
@@ -424,14 +508,73 @@ fun AnnotateScreen(uri: String, onBack: () -> Unit) {
     }
 
     if (sigDialogOpen) {
+        LaunchedEffect(Unit) {
+            savedSigs = SignatureStore.list(context)
+        }
         Dialog(onDismissRequest = { sigDialogOpen = false }) {
             Surface(
                 shape = RoundedCornerShape(24.dp),
                 color = MaterialTheme.colorScheme.surfaceContainerHigh,
                 modifier = Modifier.fillMaxWidth().padding(16.dp)
             ) {
-                Column(Modifier.padding(20.dp)) {
-                    Text("Draw your signature", style = MaterialTheme.typography.titleMedium)
+                Column(
+                    Modifier
+                        .padding(20.dp)
+                        .verticalScroll(rememberScrollState())
+                ) {
+                    if (savedSigs.isNotEmpty()) {
+                        Text("Saved", style = MaterialTheme.typography.labelMedium)
+                        Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState())
+                                .padding(top = 8.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            savedSigs.forEach { sig ->
+                                Box(
+                                    Modifier
+                                        .size(110.dp, 56.dp)
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .background(androidx.compose.ui.graphics.Color.White)
+                                        .clickable {
+                                            sigStrokes = sig.strokes
+                                            sigDialogOpen = false
+                                        }
+                                ) {
+                                    SignaturePreview(
+                                        strokes = sig.strokes,
+                                        modifier = Modifier.fillMaxSize()
+                                    )
+                                    Box(
+                                        Modifier
+                                            .align(Alignment.TopEnd)
+                                            .padding(2.dp)
+                                            .size(20.dp)
+                                            .clickable {
+                                                scope.launch { SignatureStore.delete(context, sig.id) }
+                                                savedSigs = savedSigs.filterNot { it.id == sig.id }
+                                            },
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            Icons.Default.Close,
+                                            contentDescription = "Delete saved signature",
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.size(14.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                        Text(
+                            "Draw a new signature",
+                            style = MaterialTheme.typography.titleMedium,
+                            modifier = Modifier.padding(top = 12.dp)
+                        )
+                    } else {
+                        Text("Draw your signature", style = MaterialTheme.typography.titleMedium)
+                    }
                     var sizeSig by remember { mutableStateOf(IntSize(1, 1)) }
                     Canvas(
                         Modifier
@@ -485,10 +628,24 @@ fun AnnotateScreen(uri: String, onBack: () -> Unit) {
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         TextButton(onClick = { sigDraft = emptyList() }) { Text("Clear") }
-                        TextButton(onClick = {
-                            sigStrokes = sigDraft
-                            sigDialogOpen = false
-                        }) { Text("Use signature") }
+                        TextButton(
+                            onClick = {
+                                sigStrokes = sigDraft
+                                sigDialogOpen = false
+                            },
+                            enabled = sigDraft.isNotEmpty()
+                        ) { Text("Use signature") }
+                        TextButton(
+                            onClick = {
+                                scope.launch {
+                                    val saved = SignatureStore.save(context, sigDraft)
+                                    savedSigs = savedSigs + saved
+                                }
+                                sigStrokes = sigDraft
+                                sigDialogOpen = false
+                            },
+                            enabled = sigDraft.isNotEmpty()
+                        ) { Text("Save & use") }
                     }
                 }
             }
