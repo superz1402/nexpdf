@@ -69,7 +69,7 @@ object PdfAnnotate {
         return PDColor(floatArrayOf(r, g, b), PDDeviceRGB.INSTANCE)
     }
 
-    private fun pdfPoint(
+    internal fun pdfPoint(
         dx: Float, dy: Float,
         rect: PDRectangle, rotation: Int
     ): Pair<Float, Float> {
@@ -85,7 +85,23 @@ object PdfAnnotate {
         }
     }
 
-    private fun strokeWidth(norm: Float, rect: PDRectangle): Float = (norm * rect.width).coerceIn(0.8f, 24f)
+    internal fun userToDisplay(
+        ux: Float, uy: Float,
+        rect: PDRectangle, rotation: Int
+    ): Pair<Float, Float> {
+        val x = ux - rect.lowerLeftX
+        val y = uy - rect.lowerLeftY
+        val w = rect.width
+        val h = rect.height
+        return when (rotation % 4) {
+            1 -> y / w to 1f - x / h
+            2 -> 1f - x / w to y / h
+            3 -> 1f - y / w to x / h
+            else -> x / w to 1f - y / h
+        }
+    }
+
+    internal fun strokeWidth(norm: Float, rect: PDRectangle): Float = (norm * rect.width).coerceIn(0.8f, 24f)
 
     private fun strokePath(
         cs: PDPageContentStream,

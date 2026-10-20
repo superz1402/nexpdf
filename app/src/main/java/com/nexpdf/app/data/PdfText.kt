@@ -4,12 +4,15 @@ import android.content.Context
 import android.net.Uri
 import android.os.ParcelFileDescriptor
 import com.tom_roush.pdfbox.pdmodel.PDDocument
-import com.tom_roush.pdfbox.pdmodel.PDPage
 import com.tom_roush.pdfbox.text.PDFTextStripper
 import com.tom_roush.pdfbox.text.TextPosition
 import java.io.IOException
 
 data class WordRect(val dx: Float, val dy: Float, val dw: Float, val dh: Float)
+
+internal data class GlyphVec(val x: Float, val yBaseline: Float, val w: Float, val h: Float, val fontSize: Float)
+
+internal data class Quad(val x: Float, val yTop: Float, val w: Float, val h: Float)
 
 object PdfText {
 
@@ -28,57 +31,54 @@ object PdfText {
                 collector.setEndPage(pageIndex + 1)
                 collector.setSortByPosition(true)
                 collector.getText(doc)
-                return collector.words.map { (x, yTop, w, h) ->
+                return groupWords(collector.glyphs).map { (x, yTop, w, h) ->
                     toDisplay(x, yTop, w, h, wU, hU, rot)
                 }
             }
         }
     }
 
-    private data class Quad(val x: Float, val yTop: Float, val w: Float, val h: Float)
-
-    private class WordCollector : PDFTextStripper() {
-        val words = mutableListOf<Quad>()
+    internal fun groupWords(glyphs: List<GlyphVec>): List<Quad> {
+        val quads = mutableListOf<Quad>()
         var x0 = 0f
         var yTop = 0f
         var curWidth = 0f
         var curHeight = 0f
         var started = false
+        glyphs.forEach { g ->
+            val gap = if (started) g.x - (x0 + curWidth) else 0f
+            val newLine = started && kotlin.math.abs(g.yBaseline - (yTop + curHeight)) > g.fontSize * 0.5f
+            if (started && (gap > g.fontSize * 0.45f || newLine)) {
+                if (curWidth > 0 && curHeight > 0) quads.add(Quad(x0, yTop, curWidth, curHeight))
+                started = false
+            }
+            if (!started) {
+                x0 = g.x
+                yTop = g.yBaseline - g.h
+                curWidth = 0f
+                curHeight = 0f
+                started = true
+            }
+            curWidth = (g.x + g.w) - x0
+            yTop = minOf(yTop, g.yBaseline - g.h)
+            curHeight = maxOf(curHeight, g.h)
+        }
+        if (started && curWidth > 0 && curHeight > 0) quads.add(Quad(x0, yTop, curWidth, curHeight))
+        return quads
+    }
+
+    private class WordCollector : PDFTextStripper() {
+        val glyphs = mutableListOf<GlyphVec>()
 
         @Throws(IOException::class)
-        override fun writeString(text: String, textPositions: List<TextPosition>) {            textPositions.forEach { p ->
-                val x = p.getXDirAdj()
-                val y = p.getYDirAdj()
-                val w = p.getWidthDirAdj()
-                val h = p.getHeightDir()
-                val gap = if (started) x - (x0 + curWidth) else 0f
-                if (started && gap > p.getFontSize() * 0.45f) flush()
-                if (!started) {
-                    x0 = x
-                    yTop = y - h
-                    curWidth = 0f
-                    curHeight = 0f
-                    started = true
-                }
-                curWidth = (x + w) - x0
-                curHeight = maxOf(curHeight, h)
+        override fun writeString(text: String, textPositions: List<TextPosition>) {
+            textPositions.forEach { p ->
+                glyphs.add(GlyphVec(p.getXDirAdj(), p.getYDirAdj(), p.getWidthDirAdj(), p.getHeightDir(), p.getFontSize()))
             }
-        }
-
-        override fun endPage(page: PDPage) {
-            flush()
-            super.endPage(page)
-        }
-
-        fun flush() {
-            if (started && curWidth > 0 && curHeight > 0) {
-                words.add(Quad(x0, yTop, curWidth, curHeight))
-            }
-            started = false
         }
     }
 
-    private fun toDisplay(
+    internal fun toDisplay(
         x: Float, yTop: Float, w: Float, h: Float,
         wU: Float, hU: Float, rot: Int
     ): WordRect {
