@@ -198,3 +198,15 @@ Establish GitHub-first persistence, CI-only build pipeline, and first working in
 
 ### Remaining work
 - Issues #1–#6 creation after push; CI green verification; then Task 1 (viewer page tracking + zoom), then tools engine.
+
+## 2026-10-20 — PDF upgrade program bootstrap (Phase 0/1) + issues #28, #14, #15
+- Program parent issue #13 created; children #14–#28 created and cross-linked.
+- Reference research: docs/PDF_REFERENCE_AUDIT.md (anonpdf, Pdf_Tools, Stirling-PDF, gander, docreader; verified-vs-claimed classification, license notes).
+- Program docs created: AUDIT, FEATURE_MATRIX, ARCHITECTURE, UI_COMPONENTS, TESTING, PRODUCTION_CHECKLIST.
+- Branch feat/pdf-upgrade pushed; CI trigger extended; PR #29 open (merge needs approval per program rules).
+- Issue #28 CLOSED: JVM test seed (kotlin-test-junit, Apache-2.0/EPL-1.0 noted). Found + fixed real shipped bug: rot degree normalization (rot % 4 mis-branching for 90/180/270). Run 39398536823 green. One transient silent Kotlin-daemon compile failure, re-run passed.
+- Issue #14 CLOSED: ReadingPositionStore (JSON, MD5(uri) key + title fallback, 100-recents cap, recency sort unit-tested); viewer restores page on Ready, write-gated after restore. Run 39400193458 green.
+- Issue #15 CLOSED: PdfText WordTextCollector (word text+quad from same glyphs), search() single-token + phrase sliding-window, 600-match cap; Viewer search bar with honest status, wrap navigation, tertiary overlay highlights (zoom-scaled), close restores pre-search page, Back-dismiss cascade. Run 39402694314 green.
+- Limitations recorded in issues: page-level match navigation; no search cache; no OCR search.
+- NOT RUN: all on-device behaviors (owner device) — will batch into v0.2.0 test plan.
+Next: #16 reader thumbnails/outline panel OR #18 annotation journal (decide by dependency; #18 unblocks undo/redo).
