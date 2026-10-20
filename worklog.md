@@ -1,5 +1,34 @@
 # worklog — NexPDF
 
+## 2026-10-20 SESSION 1 — Release v0.1.0 + Tasks #10/#11 (highlight, pan clamp) CLOSED
+Task: issues #10, #11 · status CLOSED · branch main · head 368e3ed
+
+### Objective
+Release the APK, publish a test plan, then finish the remaining feature queue (text-selection highlight + leftover viewer nit).
+
+### Release work
+- Pulled artifact from CI run 39378096248 before 1-day expiry; published GitHub Release v0.1.0 (tag at 9e43519, app-debug.apk upload 27,950,567 bytes).
+- Tag created via git refs API first (releases API 422 on auto-create); asset via uploads endpoint (201).
+- docs/TEST_PLAN.md: install + per-screen pass/fail checklist incl. a11y and regression watch-list.
+
+### Investigation (highlight)
+- Verified in pdfbox-android 2.0.27.0 classes.jar before coding: PDFTextStripper/TextPosition (getXDirAdj/getYDirAdj/getWidthDirAdj/getHeightDir/getFontSize), endPage(PDPage) + writeString(String, List) descriptors, PDExtendedGraphicsState.setNonStrokingAlphaConstant, PDPageContentStream.setGraphicsStateParameters (auto-registers into page resources) + addRect(FFFF) + fill.
+- Word rect → display-normalized conversion derived from true CW rotation geometry (renderer displays rotated; stripper does not) — exact at rot 0; rotated pages best-effort pending on-device check.
+
+### Implementation
+- data/PdfText.kt: WordCollector groups TextPositions into word quads split on gap > 0.45x fontSize; wordRects(context, uri, page).
+- PdfAnnotate.Op.Highlight: ExtGState alpha 0.35 fill via setGraphicsStateParameters + addRect/fill, corners through existing pdfPoint (consistent with ink/signature).
+- AnnotateScreen: HIGHLIGHT tool (Icons.Default.Highlight), drag-rect → IO word intersection → committed rects drawn at 0.35 alpha; live selection rect preview; eraser extended to remove committed rects; save/merge into ops grouped per rect; snackbar when page has no extractable text.
+- ViewerScreen ZoomablePage: pan translation clamped to ±size*(scale-1)/2 inside graphicsLayer (issue #11).
+- Release + test plan + session docs commits: 79fe3e1, 9c95e14 and closeout below.
+
+### Verification
+- 1 red CI run (39385645943): RectF destructuring slip in PdfText — replaced with Quad data class; run 39386034930 → success @ 368e3ed.
+- Runtime highlight fidelity, eraser, pan clamping: user-side via docs/TEST_PLAN.md.
+
+### Remaining work
+- Optional later: OCR/convert; signature dedupe. #7 blocked on material3 1.5.0 stable.
+
 ## 2026-10-20 SESSION 1 — Task #9 (UX polish wave) CLOSED
 Task: issue #9 · status CLOSED · branch main · head 9e43519
 

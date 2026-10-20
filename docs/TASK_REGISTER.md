@@ -13,5 +13,7 @@ Authoritative status live in GitHub Issues; this is the index map.
 | 7 | Adopt material3 1.5.0 stable MotionScheme + FlexibleBottomSheet when stable | P2 | open (blocked on 1.5.0 stable) | 6 |
 | 8 | Annotate + Fill & Sign | P2 | CLOSED (run 39248398340) | 5 |
 | 9 | UX polish wave: page-slider sheet, skeleton placeholders, pen width/eraser, signature library | P1 | CLOSED (run 39378096248) | 5, 8 |
+| 10 | Text-selection highlight | P1 | CLOSED (run 39386034930) | 9 |
+| 11 | Viewer pan-offset clamping at zoom>1 | P2 | CLOSED (run 39386034930) | 3 |
 
-Issues #1–#9 created 2026-10-19/20; #8 and #9 closed with CI evidence. #7 stays open while material3 1.5.0 remains beta.
+Issues #1–#11 created 2026-10-19/20; #8–#11 closed with CI evidence. #7 stays open while material3 1.5.0 remains beta. v0.1.0 release: tag at 9e43519, APK in Releases.

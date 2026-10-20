@@ -4,23 +4,24 @@ Updated: 2026-10-20 (Session 1)
 
 ## Repository
 - Repo: `superz1402/nexpdf` · branch `main`
-- Last commit: Closeout: issue #9 closed, session docs synced — SHA ec518e3, remote verified
+- Release v0.1.0: `NexPDF-v0.1.0-debug.apk` (tag at 9e43519) — https://github.com/superz1402/nexpdf/releases/tag/v0.1.0
+- On-device test checklist: docs/TEST_PLAN.md
 
 ## Build pipeline
 - CI-only. GitHub Actions `.github/workflows/ci.yml` on push. 1-day artifact retention.
-- last_ci_run: run 39378483124 → success @ ec518e3 (closeout); prior run 39378096248 success @ 9e43519 (UX polish wave), APK artifact `nexpdf-debug-apk` 27.4 MB.
+- last_ci_run: run 39386034930 → success @ 368e3ed (highlight + pan clamp); release build verified at 39378096248 @ 9e43519.
 
 ## App state
-- Working: library, viewer (tracking/zoom/progress, jump page-slider sheet, skeleton placeholders), tools hub (merge/images→PDF/split/organize), organizer, annotate mode (ink w/ pen widths + eraser, notes, signature with persistent library, form-fill+flatten). Stack: BOM 2025.12.00 (m3 1.4.0), compileSdk 36, AGP 8.10.1, Kotlin 2.1.20, pdfbox-android 2.0.27.0.
-- Not yet: text-selection highlight, pan clamping at zoom>1, signature dedupe on save.
+- Working: library, viewer (tracking/zoom/pan-clamped progress, jump sheet, skeletons), tools hub (merge/images→PDF/split/organize), organizer, annotate mode (ink w/ widths + eraser, notes, highlight via text selection, signature with persistent library, form-fill+flatten). Stack: BOM 2025.12.00 (m3 1.4.0), compileSdk 36, AGP 8.10.1, Kotlin 2.1.20, pdfbox-android 2.0.27.0.
+- Not yet: signature dedupe on save; OCR/convert.
 
 ## Task queue (authoritative: docs/TASK_REGISTER.md + GitHub Issues)
-1. (next) Optional: text-selection highlight (needs PDFTextStripper word-coordinate mapping), OCR/convert (later)
+1. (next) Optional: OCR/convert (later, needs runtime engine decision)
 2. Blocked: material3 1.5.0 stable → MotionScheme.expressive + FlexibleBottomSheet (issue #7)
 
-Closed this session: #9 UX polish wave (CI 39378096248). Previously closed (evidence in issues): #1 bootstrap, #2 CI+APK, #3 viewer polish, #4 UI research, #5 tools engine, #6 Expressive bump, #8 annotate+fill&sign.
+Closed this session: #9 UX polish wave (CI 39378096248), #10 text-selection highlight + #11 pan clamp (CI 39386034930). Previously closed: #1–#8.
 
 ## Blockers
-- No device/emulator: runtime verification impossible here — CI build verification only; user does on-device testing.
+- No device/emulator: runtime verification impossible here — CI build verification only; user does on-device testing (docs/TEST_PLAN.md).
 - Manifest querying MediaStore.Files may return empty on some OEMs (runCatching + SAF picker is the safe fallback; accepted for v0.1).
 
