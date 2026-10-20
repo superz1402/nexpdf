@@ -40,10 +40,13 @@ class PdfAnnotateTest {
     @Test
     fun rotationCornersStayInsidePage() {
         for (rot in listOf(0, 90, 180, 270)) {
+            val swapped = rot % 180 != 0
+            val xMax = if (swapped) 400f else 500f
+            val yMax = if (swapped) 500f else 400f
             for ((dx, dy) in listOf(0f to 0f, 1f to 0f, 0f to 1f, 1f to 1f, 0.5f to 0.5f)) {
                 val (x, y) = PdfAnnotate.pdfPoint(dx, dy, rect, rot)
-                assertTrue(x >= -0.01f && x <= 500.01f, "rot=$rot x=$x")
-                assertTrue(y >= -0.01f && y <= 400.01f, "rot=$rot y=$y")
+                assertTrue(x >= -0.01f && x <= xMax + 0.01f, "rot=$rot x=$x")
+                assertTrue(y >= -0.01f && y <= yMax + 0.01f, "rot=$rot y=$y")
             }
         }
     }
