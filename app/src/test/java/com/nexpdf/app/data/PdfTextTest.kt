@@ -2,6 +2,7 @@ package com.nexpdf.app.data
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class PdfTextTest {
@@ -80,5 +81,30 @@ class PdfTextTest {
             assertTrue(r.dx >= -0.001f && r.dx + r.dw <= 1.001f, "rot=$rot dx=${r.dx} dw=${r.dw}")
             assertTrue(r.dy >= -0.001f && r.dy + r.dh <= 1.001f, "rot=$rot dy=${r.dy} dh=${r.dh}")
         }
+    }
+
+    @Test
+    fun wordBreakOnHorizontalGap() {
+        val prev = g(100f, 200f, 8f, fontSize = 12f)
+        assertTrue(PdfText.isWordBreak(prev, g(114f, 200f, 8f, fontSize = 12f)))
+        assertFalse(PdfText.isWordBreak(prev, g(108f, 200f, 8f, fontSize = 12f)))
+    }
+
+    @Test
+    fun wordBreakOnBaselineChange() {
+        val prev = g(100f, 200f, 8f, fontSize = 12f)
+        assertTrue(PdfText.isWordBreak(prev, g(108f, 216f, 8f, fontSize = 12f)))
+        assertFalse(PdfText.isWordBreak(prev, g(108f, 204f, 8f, fontSize = 12f)))
+    }
+
+    @Test
+    fun unionCoversAllQuads() {
+        val u = PdfText.union(
+            listOf(Quad(10f, 100f, 40f, 10f), Quad(30f, 114f, 50f, 12f))
+        )
+        assertEquals(10f, u.x, 0.01f)
+        assertEquals(100f, u.yTop, 0.01f)
+        assertEquals(70f, u.w, 0.01f)
+        assertEquals(26f, u.h, 0.01f)
     }
 }
